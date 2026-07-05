@@ -33,9 +33,13 @@ export const Spreadsheet = memo(({ panelId, currentNode, tableDefinition, disabl
     const { snackError } = useSnackMessage();
     const loadFlowStatus = useSelector((state: AppState) => state.computingStatus[ComputingType.LOAD_FLOW]);
 
+    // depend on the derived boolean, not the currentNode object: any new node reference
+    // (frequent on tree updates) would otherwise rebuild every column definition and
+    // force-refresh all cells through the effect below
+    const isSecurityNode = isSecurityModificationNode(currentNode);
     const columnsDefinitions = useMemo(
-        () => mapColumns(tableDefinition, snackError, loadFlowStatus, isSecurityModificationNode(currentNode)),
-        [tableDefinition, snackError, loadFlowStatus, currentNode]
+        () => mapColumns(tableDefinition, snackError, loadFlowStatus, isSecurityNode),
+        [tableDefinition, snackError, loadFlowStatus, isSecurityNode]
     );
 
     // Refresh cells to apply styles when column definitions change (e.g. formula edit, load flow status)

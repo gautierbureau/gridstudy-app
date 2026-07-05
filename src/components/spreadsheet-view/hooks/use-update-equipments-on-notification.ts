@@ -26,7 +26,6 @@ const SPREADSHEET_EQUIPMENTS_LISTENER_ID = 'spreadsheet-equipments-listener';
 
 export function useUpdateEquipmentsOnNotification() {
     const dispatch = useDispatch();
-    const allEquipments = useSelector((state: AppState) => state.spreadsheetNetwork);
     const studyUuid = useSelector((state: AppState) => state.studyUuid);
     const currentRootNetworkUuid = useSelector((state: AppState) => state.currentRootNetworkUuid);
 
@@ -45,13 +44,13 @@ export function useUpdateEquipmentsOnNotification() {
                     dispatch(resetEquipments());
                     return;
                 }
-                const impactedSpreadsheetEquipmentsTypes = impactedElementTypes.filter((type) =>
-                    Object.keys(allEquipments.equipments).includes(type)
-                );
+                // isSpreadsheetEquipmentType is equivalent to checking membership in the
+                // spreadsheetNetwork.equipments keys (the record always holds all types):
+                // testing it directly avoids subscribing this hook to the whole slice,
+                // which re-registered the notification listener on every equipment update.
+                const impactedSpreadsheetEquipmentsTypes = impactedElementTypes.filter(isSpreadsheetEquipmentType);
                 if (impactedSpreadsheetEquipmentsTypes.length > 0) {
-                    dispatch(
-                        resetEquipmentsByTypes(impactedSpreadsheetEquipmentsTypes.filter(isSpreadsheetEquipmentType))
-                    );
+                    dispatch(resetEquipmentsByTypes(impactedSpreadsheetEquipmentsTypes));
                 }
                 return;
             }
@@ -95,7 +94,7 @@ export function useUpdateEquipmentsOnNotification() {
                 }
             }
         },
-        [studyUuid, currentRootNetworkUuid, dispatch, allEquipments]
+        [studyUuid, currentRootNetworkUuid, dispatch]
     );
 
     const listenerUpdateEquipmentsLocal = useCallback(
