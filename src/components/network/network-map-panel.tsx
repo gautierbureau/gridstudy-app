@@ -989,7 +989,14 @@ export const NetworkMapPanel = memo(function NetworkMapPanel({
 
     const onLineMenuClick = useCallback(
         (equipment: MapLine, x: number, y: number) =>
-            showEquipmentMenu(equipment as unknown as BaseEquipment, x, y, EquipmentType.LINE, null, isInDrawingMode.value),
+            showEquipmentMenu(
+                equipment as unknown as BaseEquipment,
+                x,
+                y,
+                EquipmentType.LINE,
+                null,
+                isInDrawingMode.value
+            ),
         [showEquipmentMenu, isInDrawingMode.value]
     );
 
