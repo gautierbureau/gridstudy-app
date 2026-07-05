@@ -6,7 +6,7 @@
  */
 
 import { blue, cyan, green, orange, pink, purple, red } from '@mui/material/colors';
-import { Layout } from 'plotly.js';
+import type { Layout } from 'plotly.js';
 
 export const baseColors = [red, orange, blue, green, purple, pink, cyan];
 export const defaultLayout: Partial<Layout> = {

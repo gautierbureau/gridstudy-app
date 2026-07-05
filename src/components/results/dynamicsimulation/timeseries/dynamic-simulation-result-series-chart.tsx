@@ -8,14 +8,17 @@
 import CloseIcon from '@mui/icons-material/Close';
 import FitScreenSharpIcon from '@mui/icons-material/FitScreenSharp';
 import FullscreenExitSharpIcon from '@mui/icons-material/FullscreenExitSharp';
-import PlotlySeriesChart from '../plot/plotly-series-chart';
-import { Card, CardContent, CardHeader, Typography } from '@mui/material';
-import { memo, useCallback, useState } from 'react';
+import { Card, CardContent, CardHeader, LinearProgress, Typography } from '@mui/material';
+import { lazy, memo, Suspense, useCallback, useState } from 'react';
 import TooltipIconButton from '../../../common/tooltip-icon-button';
 import { lighten } from '@mui/material/styles';
 import { useIntl } from 'react-intl';
 import { Series } from '../plot/plot-types';
 import { mergeSx, type MuiStyles } from '@gridsuite/commons-ui';
+
+// Lazy-loaded so the plotly dist (~1MB) is only fetched when a dynamic simulation
+// chart is actually displayed.
+const PlotlySeriesChart = lazy(() => import('../plot/plotly-series-chart'));
 
 const styles = {
     cardActionButton: (theme) => ({
@@ -152,13 +155,15 @@ function DynamicSimulationResultSeriesChart({
                     event.stopPropagation();
                 }}
             >
-                <PlotlySeriesChart
-                    id={id}
-                    groupId={groupId}
-                    leftSeries={leftSeries}
-                    rightSeries={rightSeries}
-                    sync={sync}
-                />
+                <Suspense fallback={<LinearProgress />}>
+                    <PlotlySeriesChart
+                        id={id}
+                        groupId={groupId}
+                        leftSeries={leftSeries}
+                        rightSeries={rightSeries}
+                        sync={sync}
+                    />
+                </Suspense>
             </CardContent>
         </Card>
     );
