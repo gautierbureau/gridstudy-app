@@ -37,6 +37,19 @@ import {
     saveLocalStoragePanelState,
 } from '../redux/session-storage/workspace-local-storage';
 
+// hoisted so ReactFlow doesn't receive a new object identity on every render
+const defaultEdgeOptions = {
+    type: 'smoothstep',
+    pathOptions: {
+        // TODO This negative offset and borderRadius values are needed to have round corners on the edge,
+        // but because the nodes are not totally opaque, we can see the edges behind the nodes.
+        // When the nodes are redesigned and hopefully the colors are set without transparency, we can use
+        // the round edges by un-commenting the two lines below.
+        //offset: -24,
+        //borderRadius: 48,
+    },
+};
+
 const styles = {
     modificationTree: (theme) => ({
         flexGrow: 1,
@@ -335,17 +348,7 @@ const NetworkModificationTree = ({ onNodeContextMenu, studyUuid, panelId }) => {
                 nodeClickDistance={5} // to avoid triggering onNodeDragStop instead of onNodeClick sometimes
                 disableKeyboardA11y
                 deleteKeyCode={null}
-                defaultEdgeOptions={{
-                    type: 'smoothstep',
-                    pathOptions: {
-                        // TODO This negative offset and borderRadius values are needed to have round corners on the edge,
-                        // but because the nodes are not totally opaque, we can see the edges behind the nodes.
-                        // When the nodes are redesigned and hopefully the colors are set without transparency, we can use
-                        // the round edges by un-commenting the two lines below.
-                        //offset: -24,
-                        //borderRadius: 48,
-                    },
-                }}
+                defaultEdgeOptions={defaultEdgeOptions}
             >
                 <Controls
                     position="bottom-right"
