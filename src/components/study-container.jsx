@@ -5,6 +5,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+import '../ag-grid-setup';
 import StudyPane from './study-pane';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router';

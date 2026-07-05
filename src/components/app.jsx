@@ -5,7 +5,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { retrieveOptionalServices } from './utils/optional-services';
 import { Navigate, Route, Routes, useLocation, useMatch, useNavigate } from 'react-router';
@@ -33,7 +33,7 @@ import PageNotFound from './page-not-found';
 import { FormattedMessage } from 'react-intl';
 import { APP_NAME, PARAM_USE_NAME } from '../utils/config-params';
 import AppTopBar from './app-top-bar';
-import { StudyContainer } from './study-container';
+import { LinearProgress } from '@mui/material';
 import { fetchDefaultParametersValues, fetchIdpSettings } from '../services/utils';
 import { getOptionalServices } from '../services/study/index';
 import {
@@ -77,6 +77,12 @@ import { useGlobalFilterOptions } from './results/common/global-filter/use-globa
 import { updateComputationColumnFilters, updateComputationGlobalFilters } from './results/common/utils.ts';
 import { isEditingGlobalFilter } from '../utils/editing-global-filter-sync.ts';
 import { cleanupStaleStudyData } from '../redux/session-storage/local-storage';
+
+// Lazy-loaded so the heavy study UI (map, diagrams, spreadsheets, results) is code-split
+// out of the initial bundle and only fetched when a study is opened.
+const StudyContainer = lazy(() =>
+    import('./study-container').then((module) => ({ default: module.StudyContainer }))
+);
 
 const noUserManager = { instance: null, error: null };
 
@@ -427,7 +433,14 @@ const App = () => {
                 >
                     {userProfile !== null ? (
                         <Routes>
-                            <Route path="/studies/:studyUuid" element={<StudyContainer />} />
+                            <Route
+                                path="/studies/:studyUuid"
+                                element={
+                                    <Suspense fallback={<LinearProgress />}>
+                                        <StudyContainer />
+                                    </Suspense>
+                                }
+                            />
                             <Route
                                 path="/sign-in-callback"
                                 element={<Navigate replace to={getPreLoginPath() || '/'} />}
