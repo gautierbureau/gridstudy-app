@@ -12,8 +12,10 @@ import { baseColors, defaultLayout } from './plot-config';
 import { eventCenter, PlotEvents } from './plot-events';
 import { Series } from './plot-types';
 import { useDebounce } from '@gridsuite/commons-ui';
-import { Figure, PlotParams } from 'react-plotly.js';
-import { Layout, PlotData, PlotMarker } from 'plotly.js';
+// `import type` is required here: plain imports would create a runtime dependency on
+// the full plotly.js dist (~1MB), defeating the deliberate use of plotly.js-basic-dist-min.
+import type { Figure, PlotParams } from 'react-plotly.js';
+import type { Layout, PlotData, PlotMarker } from 'plotly.js';
 
 type CustomPlotParams = PlotParams & {
     ref: Ref<CustomPlotParams> /* hack to pass ref which is not in PlotParams type */;

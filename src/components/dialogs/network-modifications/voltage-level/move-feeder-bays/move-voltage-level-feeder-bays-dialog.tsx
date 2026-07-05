@@ -48,8 +48,13 @@ import {
     fetchBusesOrBusbarSectionsForVoltageLevel,
     fetchVoltageLevelFeederBaysInfos,
 } from '../../../../../services/study/network';
-import { isNumber } from 'mathjs';
 import { FeederBaysInfos } from '../../../../../services/study/network-map.type';
+
+// Local type guard instead of mathjs's isNumber: importing it from mathjs pulls the
+// whole ~650kB library into this dialog's chunk for a one-line check.
+function isNumber(value: unknown): value is number {
+    return typeof value === 'number';
+}
 
 function requiredWhenActive<T extends yup.Schema>(schema: T) {
     return schema.when([IS_REMOVED, IS_SEPARATOR], ([isRemoved, isSeparator], schema) => {
