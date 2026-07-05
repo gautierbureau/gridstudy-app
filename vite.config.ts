@@ -77,6 +77,18 @@ export default defineConfig((_config) => ({
                 // react/@mui) makes rollup hoist those shared dependencies into the manual chunk,
                 // turning it into a static dependency of the entry and defeating lazy loading.
                 manualChunks(id: string) {
+                    // Tiny dependency-free helpers shared across many packages: give them a
+                    // stable micro-chunk. Otherwise rollup may co-locate them inside one of the
+                    // big vendor chunks below, making that whole chunk a static dependency of
+                    // every chunk using the helper (e.g. the entry pulling 1.6MB of map-gl just
+                    // for vite's dynamic-import preload helper).
+                    if (
+                        id.includes('@babel/runtime/') ||
+                        id === '\0vite/preload-helper.js' ||
+                        id === '\0commonjsHelpers.js'
+                    ) {
+                        return 'vendor-helpers';
+                    }
                     if (!id.includes('node_modules')) {
                         return undefined;
                     }
