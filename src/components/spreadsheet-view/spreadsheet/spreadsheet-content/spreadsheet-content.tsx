@@ -169,7 +169,7 @@ export const SpreadsheetContent = memo(
         const transformedRowData = useMemo(() => {
             const currentNodeData: Record<string, Identifiable> = equipments.equipmentsByNodeId[currentNode.id];
             // Map lookup instead of a linear .find() per node (O(nodes × aliases))
-            const aliasByNodeId = new Map(nodeAliases?.map((value) => [value.id, value]));
+            const aliasByNodeId = new Map(nodeAliases?.map((value) => [value.id as string, value]));
             return Object.values(
                 Object.entries(equipments.equipmentsByNodeId).reduce(
                     (prev, [nodeId, nodeEquipments]) => {
