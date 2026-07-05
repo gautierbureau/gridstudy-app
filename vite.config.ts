@@ -84,6 +84,7 @@ export default defineConfig((_config) => ({
                     // for vite's dynamic-import preload helper).
                     if (
                         id.includes('@babel/runtime/') ||
+                        id.includes('node_modules/prop-types/') ||
                         id === '\0vite/preload-helper.js' ||
                         id === '\0commonjsHelpers.js'
                     ) {
@@ -91,6 +92,12 @@ export default defineConfig((_config) => ({
                     }
                     if (!id.includes('node_modules')) {
                         return undefined;
+                    }
+                    // React must live in its own chunk: ag-grid-react/react-plotly also import
+                    // it, and without this pin rollup hoists react into one of the heavy vendor
+                    // chunks, making it a static dependency of the entry.
+                    if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) {
+                        return 'vendor-react';
                     }
                     if (id.includes('plotly.js')) {
                         return 'vendor-plotly';
