@@ -5,7 +5,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { createReducer, type Draft } from '@reduxjs/toolkit';
+import { createReducer, original, type Draft } from '@reduxjs/toolkit';
 import {
     type AuthenticationActions,
     type AuthenticationRouterErrorAction,
@@ -788,13 +788,11 @@ export const reducer = createReducer(initialState, (builder) => {
         state.tables.addedTable = null;
         state.tableFilters.columnsFilters[TableType.Spreadsheet] = Object.values(action.tableDefinitions)
             .map((tabDef) => tabDef.uuid)
-            .reduce(
-                (acc, tabUuid) => ({
-                    ...acc,
-                    [tabUuid]: action?.tablesFilters?.[tabUuid] ?? [],
-                }),
-                {}
-            );
+            .reduce((acc: Record<string, FilterConfig[]>, tabUuid) => {
+                // mutate the accumulator: spreading it on each iteration is O(n²) in tab count
+                acc[tabUuid] = action?.tablesFilters?.[tabUuid] ?? [];
+                return acc;
+            }, {});
         state[TABLE_SORT_STORE][SPREADSHEET_SORT_STORE] = Object.values(action.tableDefinitions)
             .map((tabDef) => tabDef.uuid)
             .reduce((acc, tabUuid) => {
@@ -807,6 +805,8 @@ export const reducer = createReducer(initialState, (builder) => {
                 return acc;
             }, {} as TableSortConfig);
         const spreadsheetGlobalFilters = action.globalFilters ?? {};
+        // Set lookup instead of a linear .some() scan per filter (O(tabs × filters × options))
+        const existingGlobalFilterUuids = new Set(state.globalFilterOptions.map((opt) => opt.uuid));
         Object.entries(spreadsheetGlobalFilters).forEach(([tabUuid, filters]) => {
             const selectedFilters = filters.filter((f) => !f.unselectedDate);
             const recentFilters = filters.filter((f) => !!f.unselectedDate);
@@ -816,8 +816,8 @@ export const reducer = createReducer(initialState, (builder) => {
             };
             // Store full objects in globalFilterOptions only if not already present
             filters.filter(isCriteriaFilter).forEach((filter) => {
-                const alreadyExists = state.globalFilterOptions.some((opt) => opt.uuid === filter.uuid);
-                if (!alreadyExists) {
+                if (!existingGlobalFilterUuids.has(filter.uuid)) {
+                    existingGlobalFilterUuids.add(filter.uuid);
                     state.globalFilterOptions.push(addGlobalFilterId(filter));
                 }
             });
@@ -1336,19 +1336,28 @@ export const reducer = createReducer(initialState, (builder) => {
                     connectedComponentNum: undefined,
                 };
         }
+        // Only rewrite equipments that actually carry one of the cleaned props. Reading
+        // through original() avoids creating an immer proxy per equipment, and nodes with
+        // nothing to clean keep their map reference, so downstream memos don't recompute.
+        // The previous implementation cloned every equipment of every node on each
+        // dispatch (O(nodes × equipments) allocations).
+        const propsToCleanKeys = Object.keys(propsToClean);
+        const equipmentsByNodeId = original(
+            state.spreadsheetNetwork.equipments[action.equipmentType]
+        )!.equipmentsByNodeId;
         state.spreadsheetNetwork.nodesIds.forEach((nodeId: UUID) => {
-            state.spreadsheetNetwork.equipments[action.equipmentType].equipmentsByNodeId[nodeId] = Object.values(
-                state.spreadsheetNetwork.equipments[action.equipmentType].equipmentsByNodeId[nodeId]
-            ).reduce(
-                (acc, eq) => {
-                    acc[eq.id] = {
+            const nodeEquipments = equipmentsByNodeId[nodeId];
+            if (!nodeEquipments) {
+                return;
+            }
+            for (const eq of Object.values(nodeEquipments)) {
+                if (propsToCleanKeys.some((key) => (eq as Record<string, any>)[key] !== undefined)) {
+                    state.spreadsheetNetwork.equipments[action.equipmentType].equipmentsByNodeId[nodeId][eq.id] = {
                         ...eq,
                         ...propsToClean,
                     };
-                    return acc;
-                },
-                {} as Record<string, any> // Has to be typed as any until we define specific types for all DTOs
-            );
+                }
+            }
         });
     });
 
