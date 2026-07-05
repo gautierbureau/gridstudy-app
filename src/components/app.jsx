@@ -80,9 +80,7 @@ import { cleanupStaleStudyData } from '../redux/session-storage/local-storage';
 
 // Lazy-loaded so the heavy study UI (map, diagrams, spreadsheets, results) is code-split
 // out of the initial bundle and only fetched when a study is opened.
-const StudyContainer = lazy(() =>
-    import('./study-container').then((module) => ({ default: module.StudyContainer }))
-);
+const StudyContainer = lazy(() => import('./study-container').then((module) => ({ default: module.StudyContainer })));
 
 const noUserManager = { instance: null, error: null };
 
