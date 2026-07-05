@@ -6,7 +6,7 @@
  */
 
 import { useCallback, useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { shallowEqual, useDispatch, useSelector } from 'react-redux';
 import {
     addSpreadsheetLoadedNodesIds,
     cleanEquipments,
@@ -27,7 +27,16 @@ export const useSpreadsheetEquipments = () => {
     const currentNode = useSelector((state: AppState) => state.currentTreeNode);
     const treeNodes = useSelector((state: AppState) => state.networkModificationTreeModel?.treeNodes);
     const loadedNodesIds = useSelector((state: AppState) => state.spreadsheetNetwork.nodesIds);
-    const equipments = useSelector((state: AppState) => state.spreadsheetNetwork.equipments);
+    // This hook only branches on per-type initialization, so subscribe to a boolean map
+    // instead of the whole equipments record: the record reference changes on every
+    // equipment update of any type, while this map only changes on (de)initialization.
+    const equipmentsInitialized = useSelector(
+        (state: AppState) =>
+            Object.fromEntries(
+                Object.entries(state.spreadsheetNetwork.equipments).map(([type, eq]) => [type, eq.isInitialized])
+            ) as Record<SpreadsheetEquipmentType, boolean>,
+        shallowEqual
+    );
     const tablesDefinitions = useSelector((state: AppState) => state.tables.definitions);
     const { nodeAliases } = useNodeAliases();
     const { fetchNodesEquipmentData } = useFetchEquipment();
@@ -44,7 +53,7 @@ export const useSpreadsheetEquipments = () => {
 
     useEffect(() => {
         applyToAllTypes((type) => {
-            if (cleanOptional[type] && equipments[type].isInitialized) {
+            if (cleanOptional[type] && equipmentsInitialized[type]) {
                 dispatch(cleanEquipments(type));
                 equipmentsWithLoadingOptionsCleaned(type);
             }
@@ -75,7 +84,7 @@ export const useSpreadsheetEquipments = () => {
         if (nodesIdsToRemove.size > 0) {
             dispatch(removeSpreadsheetLoadedNodesIds([...nodesIdsToRemove]));
             applyToAllTypes((type) => {
-                if (equipments[type].isInitialized) {
+                if (equipmentsInitialized[type]) {
                     dispatch(removeNodeData(type, [...nodesIdsToRemove]));
                 }
             });
@@ -89,13 +98,13 @@ export const useSpreadsheetEquipments = () => {
         if (nodesIdsToFetch.size > 0) {
             dispatch(addSpreadsheetLoadedNodesIds([...nodesIdsToFetch]));
             applyToAllTypes((type) => {
-                if (equipments[type].isInitialized) {
+                if (equipmentsInitialized[type]) {
                     fetchNodesEquipmentData(type, nodesIdsToFetch);
                 }
             });
         } else {
             applyToAllTypes((type) => {
-                if (loadOptional[type] && equipments[type].isInitialized) {
+                if (loadOptional[type] && equipmentsInitialized[type]) {
                     fetchNodesEquipmentData(type, builtNodesIds);
                     equipmentsWithLoadingOptionsLoaded(type);
                 }

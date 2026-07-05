@@ -50,18 +50,25 @@ const CustomAggridSortReduxProvider = ({ children }: PropsWithChildren) => {
     return <CustomAggridSortContext.Provider value={value}>{children}</CustomAggridSortContext.Provider>;
 };
 
+// stable identity for tabs without filters, so consumers' effects keyed on the
+// filters array don't re-run on every context invalidation
+const NO_FILTERS: FilterConfig[] = [];
+
 const CustomAggridFilterReduxProvider = ({ children }: PropsWithChildren) => {
     const dispatch = useDispatch();
     const { snackError } = useSnackMessage();
     const studyUuid = useSelector((state: AppState) => state.studyUuid);
     const tableDefinitions = useSelector((state: AppState) => state.tables.definitions);
-    const tableFilters = useSelector((state: AppState) => state.tableFilters);
+    // Subscribe to columnsFilters only, not the whole tableFilters slice: this provider
+    // wraps every grid in the app, and the context value identity drives their
+    // re-renders — global-filter updates must not invalidate every grid's headers.
+    const columnsFilters = useSelector((state: AppState) => state.tableFilters.columnsFilters);
 
     const getFilters = useCallback(
         ({ type, tab }: Pick<FilterParams, 'type' | 'tab'>): FilterConfig[] => {
-            return tableFilters.columnsFilters?.[type]?.[tab] ?? [];
+            return columnsFilters?.[type]?.[tab] ?? NO_FILTERS;
         },
-        [tableFilters]
+        [columnsFilters]
     );
 
     const updateFilter = useCallback(
