@@ -168,10 +168,12 @@ export const SpreadsheetContent = memo(
 
         const transformedRowData = useMemo(() => {
             const currentNodeData: Record<string, Identifiable> = equipments.equipmentsByNodeId[currentNode.id];
+            // Map lookup instead of a linear .find() per node (O(nodes × aliases))
+            const aliasByNodeId = new Map(nodeAliases?.map((value) => [value.id as string, value]));
             return Object.values(
                 Object.entries(equipments.equipmentsByNodeId).reduce(
                     (prev, [nodeId, nodeEquipments]) => {
-                        const nodeAlias = nodeAliases.find((value) => value.id === nodeId);
+                        const nodeAlias = aliasByNodeId.get(nodeId);
                         if (nodeAlias) {
                             Object.values(nodeEquipments).forEach((eq) => {
                                 // To avoid empty lines in case of deleted equipments in current node but defined in another one
