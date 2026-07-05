@@ -67,5 +67,58 @@ export default defineConfig((_config) => ({
     preview: serverSettings, // for npm run serve (use local build)
     build: {
         outDir: 'build',
+        rollupOptions: {
+            output: {
+                // Split the biggest, rarely-changing vendors into their own chunks so that
+                // (a) app-code changes don't bust the cached vendor payload and
+                // (b) lazily-imported subtrees keep their heavy vendors out of the entry chunk.
+                // Only self-contained libraries may be listed here: assigning a library that
+                // shares dependencies with the app (e.g. @powsybl/network-viewer, which imports
+                // react/@mui) makes rollup hoist those shared dependencies into the manual chunk,
+                // turning it into a static dependency of the entry and defeating lazy loading.
+                manualChunks(id: string) {
+                    // Tiny dependency-free helpers shared across many packages: give them a
+                    // stable micro-chunk. Otherwise rollup may co-locate them inside one of the
+                    // big vendor chunks below, making that whole chunk a static dependency of
+                    // every chunk using the helper (e.g. the entry pulling 1.6MB of map-gl just
+                    // for vite's dynamic-import preload helper).
+                    if (
+                        id.includes('@babel/runtime/') ||
+                        id.includes('node_modules/prop-types/') ||
+                        id === '\0vite/preload-helper.js' ||
+                        id === '\0commonjsHelpers.js'
+                    ) {
+                        return 'vendor-helpers';
+                    }
+                    if (!id.includes('node_modules')) {
+                        return undefined;
+                    }
+                    // React must live in its own chunk: ag-grid-react/react-plotly also import
+                    // it, and without this pin rollup hoists react into one of the heavy vendor
+                    // chunks, making it a static dependency of the entry.
+                    if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) {
+                        return 'vendor-react';
+                    }
+                    if (id.includes('plotly.js')) {
+                        return 'vendor-plotly';
+                    }
+                    if (id.includes('ag-grid')) {
+                        return 'vendor-ag-grid';
+                    }
+                    if (
+                        id.includes('maplibre-gl') ||
+                        id.includes('deck.gl') ||
+                        id.includes('@luma.gl') ||
+                        id.includes('@loaders.gl')
+                    ) {
+                        return 'vendor-map-gl';
+                    }
+                    if (id.includes('node_modules/mathjs/')) {
+                        return 'vendor-mathjs';
+                    }
+                    return undefined;
+                },
+            },
+        },
     },
 }));

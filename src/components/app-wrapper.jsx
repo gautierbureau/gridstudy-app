@@ -116,16 +116,9 @@ import base_voltages_fr from '../translations/external/base-voltages-fr';
 import base_voltages_en from '../translations/external/base-voltages-en';
 import { basemap_style_theme_key } from '../utils/config-params';
 import useNotificationsUrlGenerator from 'hooks/use-notifications-url-generator';
-import { AllCommunityModule, ModuleRegistry, provideGlobalGridOptions } from 'ag-grid-community';
 import { getBaseVoltagesCssVars } from '../utils/colors.ts';
 import { lightThemeCssVars } from '../styles/light-theme-css-vars.ts';
 import { darkThemeCssVars } from '../styles/dark-theme-css-vars.ts';
-
-// Register all community features (migration to V33)
-ModuleRegistry.registerModules([AllCommunityModule]);
-
-// Mark all grids as using legacy themes (migration to V33)
-provideGlobalGridOptions({ theme: 'legacy' });
 
 const lightTheme = createTheme({
     components: {
