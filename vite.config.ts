@@ -67,5 +67,39 @@ export default defineConfig((_config) => ({
     preview: serverSettings, // for npm run serve (use local build)
     build: {
         outDir: 'build',
+        rollupOptions: {
+            output: {
+                // Split the biggest, rarely-changing vendors into their own chunks so that
+                // (a) app-code changes don't bust the cached vendor payload and
+                // (b) lazily-imported subtrees keep their heavy vendors out of the entry chunk.
+                // Only self-contained libraries may be listed here: assigning a library that
+                // shares dependencies with the app (e.g. @powsybl/network-viewer, which imports
+                // react/@mui) makes rollup hoist those shared dependencies into the manual chunk,
+                // turning it into a static dependency of the entry and defeating lazy loading.
+                manualChunks(id: string) {
+                    if (!id.includes('node_modules')) {
+                        return undefined;
+                    }
+                    if (id.includes('plotly.js')) {
+                        return 'vendor-plotly';
+                    }
+                    if (id.includes('ag-grid')) {
+                        return 'vendor-ag-grid';
+                    }
+                    if (
+                        id.includes('maplibre-gl') ||
+                        id.includes('deck.gl') ||
+                        id.includes('@luma.gl') ||
+                        id.includes('@loaders.gl')
+                    ) {
+                        return 'vendor-map-gl';
+                    }
+                    if (id.includes('node_modules/mathjs/')) {
+                        return 'vendor-mathjs';
+                    }
+                    return undefined;
+                },
+            },
+        },
     },
 }));
