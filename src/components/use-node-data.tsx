@@ -117,6 +117,13 @@ export function useNodeData<T, R = T>({
     const nodeUuidRef = useRef<UUID>(undefined);
     const rootNetworkUuidRef = useRef<UUID>(undefined);
     const lastUpdateRef = useRef<LastUpdateParams<T>>(undefined);
+    // Read through a ref so that callers passing an inline converter (a new function
+    // identity every render) don't re-create the fetch callback and re-register the
+    // notification listener on every parent render.
+    const resultConverterRef = useRef(resultConverter);
+    useEffect(() => {
+        resultConverterRef.current = resultConverter;
+    });
     // Monotonic id identifying the latest in-flight request. A response is only
     // applied when its id is still the latest one, so an out-of-order response
     // from a previous fetcher (e.g. another node, another root network, or
@@ -134,7 +141,7 @@ export function useNodeData<T, R = T>({
         fetcher?.(studyUuid, nodeUuid, rootNetworkUuid)
             .then((res) => {
                 if (isLatestRequest()) {
-                    setResult(resultConverter(res) ?? undefined);
+                    setResult(resultConverterRef.current(res) ?? undefined);
                 }
             })
             .catch((error) => {
@@ -148,9 +155,12 @@ export function useNodeData<T, R = T>({
                     setIsLoading(false);
                 }
             });
-    }, [nodeUuid, fetcher, rootNetworkUuid, studyUuid, resultConverter, snackError]);
+    }, [nodeUuid, fetcher, rootNetworkUuid, studyUuid, snackError]);
 
-    // Debounce the update to avoid excessive calls
+    // Debounce the notification-driven updates to avoid excessive calls during
+    // computation/build bursts. The initial fetch (mount, node/root-network/fetcher
+    // change) deliberately bypasses this debounce — see the effect below — so result
+    // views don't stall for a second on every node or tab switch.
     const debouncedUpdate = useDebounce(update, 1000);
 
     const evaluateUpdate = useCallback(
@@ -181,10 +191,21 @@ export function useNodeData<T, R = T>({
         listenerCallbackMessage: evaluateUpdate,
     });
 
-    /* initial fetch and update */
+    /* initial fetch, and refetch when node, root network or fetcher change: immediate,
+       without the notification debounce */
     useEffect(() => {
-        evaluateUpdate();
-    }, [evaluateUpdate]);
+        if (!studyUuid || !nodeUuid || !rootNetworkUuid || !fetcher) {
+            return;
+        }
+        if (
+            nodeUuidRef.current !== nodeUuid ||
+            rootNetworkUuidRef.current !== rootNetworkUuid ||
+            lastUpdateRef.current?.fetcher !== fetcher
+        ) {
+            lastUpdateRef.current = { eventData: null, fetcher };
+            update();
+        }
+    }, [studyUuid, nodeUuid, rootNetworkUuid, fetcher, update]);
 
     return { result, isLoading, setResult, update };
 }

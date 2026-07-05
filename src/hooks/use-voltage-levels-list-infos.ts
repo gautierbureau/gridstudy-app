@@ -14,9 +14,17 @@ export default function useVoltageLevelsListInfos(studyUuid: UUID, nodeUuid: UUI
     const [voltageLevelsListInfos, setVoltageLevelsListInfos] = useState<Identifiable[]>([]);
     useEffect(() => {
         if (studyUuid && nodeUuid && currentRootNetworkUuid) {
-            fetchVoltageLevelsListInfos(studyUuid, nodeUuid, currentRootNetworkUuid).then((values) =>
-                setVoltageLevelsListInfos(values.sort((a, b) => a.id.localeCompare(b.id)))
-            );
+            // guard against out-of-order responses on rapid node/root-network switches:
+            // without it, an older in-flight response can overwrite the newer list
+            let cancelled = false;
+            fetchVoltageLevelsListInfos(studyUuid, nodeUuid, currentRootNetworkUuid).then((values) => {
+                if (!cancelled) {
+                    setVoltageLevelsListInfos(values.sort((a, b) => a.id.localeCompare(b.id)));
+                }
+            });
+            return () => {
+                cancelled = true;
+            };
         }
     }, [studyUuid, nodeUuid, currentRootNetworkUuid]);
     return voltageLevelsListInfos;
