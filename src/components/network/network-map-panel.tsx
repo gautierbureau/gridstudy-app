@@ -136,6 +136,16 @@ type NetworkMapPanelProps = {
     triggerMapResizeOnChange?: any[];
 };
 
+function getHvdcExtendedEquipmentType(hvdcType: string): ExtendedEquipmentType | null {
+    if (hvdcType === HvdcType.VSC) {
+        return ExtendedEquipmentType.HVDC_LINE_VSC;
+    } else if (hvdcType === HvdcType.LCC) {
+        return ExtendedEquipmentType.HVDC_LINE_LCC;
+    } else {
+        return null;
+    }
+}
+
 export const NetworkMapPanel = memo(function NetworkMapPanel({
     studyUuid,
     currentNode,
@@ -316,12 +326,15 @@ export const NetworkMapPanel = memo(function NetworkMapPanel({
         onOpenDynamicSimulationEventDialog: handleOpenDynamicSimulationEventDialog,
     });
 
-    const voltageLevelMenuClick = (equipment: MapVoltageLevel, x: number, y: number) => {
-        // don't display the voltage level menu in drawing mode.
-        if (!isInDrawingMode.value) {
-            openEquipmentMenu(equipment as unknown as BaseEquipment, x, y, EquipmentType.VOLTAGE_LEVEL, null);
-        }
-    };
+    const voltageLevelMenuClick = useCallback(
+        (equipment: MapVoltageLevel, x: number, y: number) => {
+            // don't display the voltage level menu in drawing mode.
+            if (!isInDrawingMode.value) {
+                openEquipmentMenu(equipment as unknown as BaseEquipment, x, y, EquipmentType.VOLTAGE_LEVEL, null);
+            }
+        },
+        [openEquipmentMenu, isInDrawingMode]
+    );
 
     const chooseVoltageLevelForSubstation = useCallback(
         (idSubstation: string, x: number, y: number) => {
@@ -941,19 +954,62 @@ export const NetworkMapPanel = memo(function NetworkMapPanel({
         ? mapEquipments?.getSubstation(choiceVoltageLevelsSubstationId)
         : null;
 
-    const showEquipmentMenu = (
-        equipment: BaseEquipment,
-        x: number,
-        y: number,
-        equipmentType: EquipmentType,
-        equipmentSubtype: ExtendedEquipmentType | null,
-        isInDrawingMode: boolean
-    ) => {
-        // don't display the equipment menu in drawing mode.
-        if (!isInDrawingMode) {
-            openEquipmentMenu(equipment, x, y, equipmentType, equipmentSubtype);
-        }
-    };
+    const showEquipmentMenu = useCallback(
+        (
+            equipment: BaseEquipment,
+            x: number,
+            y: number,
+            equipmentType: EquipmentType,
+            equipmentSubtype: ExtendedEquipmentType | null,
+            isInDrawingMode: boolean
+        ) => {
+            // don't display the equipment menu in drawing mode.
+            if (!isInDrawingMode) {
+                openEquipmentMenu(equipment, x, y, equipmentType, equipmentSubtype);
+            }
+        },
+        [openEquipmentMenu]
+    );
+
+    // The menu handlers below are stabilized (and the updated-lines arrays merged in a
+    // memo) because NetworkMap diffs its props: fresh array/handler identities on every
+    // render force it to rebuild deck.gl layers on unrelated panel re-renders.
+    const onSubstationMenuClick = useCallback(
+        (equipment: MapSubstation, x: number, y: number) =>
+            showEquipmentMenu(
+                equipment as unknown as BaseEquipment,
+                x,
+                y,
+                EquipmentType.SUBSTATION,
+                null,
+                isInDrawingMode.value
+            ),
+        [showEquipmentMenu, isInDrawingMode.value]
+    );
+
+    const onLineMenuClick = useCallback(
+        (equipment: MapLine, x: number, y: number) =>
+            showEquipmentMenu(equipment as unknown as BaseEquipment, x, y, EquipmentType.LINE, null, isInDrawingMode.value),
+        [showEquipmentMenu, isInDrawingMode.value]
+    );
+
+    const onHvdcLineMenuClick = useCallback(
+        (equipment: MapHvdcLine, x: number, y: number) =>
+            showEquipmentMenu(
+                equipment as unknown as BaseEquipment,
+                x,
+                y,
+                EquipmentType.HVDC_LINE,
+                getHvdcExtendedEquipmentType(equipment.hvdcType),
+                isInDrawingMode.value
+            ),
+        [showEquipmentMenu, isInDrawingMode.value]
+    );
+
+    const allUpdatedLines = useMemo(
+        () => [...(updatedLines ?? []), ...(updatedTieLines ?? []), ...(updatedHvdcLines ?? [])],
+        [updatedLines, updatedTieLines, updatedHvdcLines]
+    );
 
     function renderVoltageLevelChoice() {
         return (
@@ -1058,16 +1114,6 @@ export const NetworkMapPanel = memo(function NetworkMapPanel({
         [openSLD, isInDrawingMode]
     );
 
-    const getHvdcExtendedEquipmentType = (hvdcType: string): ExtendedEquipmentType | null => {
-        if (hvdcType === HvdcType.VSC) {
-            return ExtendedEquipmentType.HVDC_LINE_VSC;
-        } else if (hvdcType === HvdcType.LCC) {
-            return ExtendedEquipmentType.HVDC_LINE_LCC;
-        } else {
-            return null;
-        }
-    };
-
     const getNetworkMapColor = useCallback(
         (voltageValue: number): Color => {
             return getBaseVoltageNetworkMapColor(getBaseVoltageInterval(voltageValue)) as Color;
@@ -1098,7 +1144,7 @@ export const NetworkMapPanel = memo(function NetworkMapPanel({
                     ref={networkMapRef}
                     mapEquipments={mapEquipments}
                     geoData={geoData}
-                    updatedLines={[...(updatedLines ?? []), ...(updatedTieLines ?? []), ...(updatedHvdcLines ?? [])]}
+                    updatedLines={allUpdatedLines}
                     displayOverlayLoader={!basicDataReady && mapDataLoading}
                     filteredNominalVoltages={filteredNominalVoltages}
                     labelsZoomThreshold={LABELS_ZOOM_THRESHOLD}
@@ -1112,36 +1158,9 @@ export const NetworkMapPanel = memo(function NetworkMapPanel({
                     disabled={disabled}
                     onSubstationClick={handleOpenVoltageLevel}
                     onSubstationClickChooseVoltageLevel={chooseVoltageLevelForSubstation}
-                    onSubstationMenuClick={(equipment: MapSubstation, x: number, y: number) =>
-                        showEquipmentMenu(
-                            equipment as unknown as BaseEquipment,
-                            x,
-                            y,
-                            EquipmentType.SUBSTATION,
-                            null,
-                            isInDrawingMode.value
-                        )
-                    }
-                    onLineMenuClick={(equipment: MapLine, x: number, y: number) =>
-                        showEquipmentMenu(
-                            equipment as unknown as BaseEquipment,
-                            x,
-                            y,
-                            EquipmentType.LINE,
-                            null,
-                            isInDrawingMode.value
-                        )
-                    }
-                    onHvdcLineMenuClick={(equipment: MapHvdcLine, x: number, y: number) =>
-                        showEquipmentMenu(
-                            equipment as unknown as BaseEquipment,
-                            x,
-                            y,
-                            EquipmentType.HVDC_LINE,
-                            getHvdcExtendedEquipmentType(equipment.hvdcType),
-                            isInDrawingMode.value
-                        )
-                    }
+                    onSubstationMenuClick={onSubstationMenuClick}
+                    onLineMenuClick={onLineMenuClick}
+                    onHvdcLineMenuClick={onHvdcLineMenuClick}
                     onVoltageLevelMenuClick={voltageLevelMenuClick}
                     mapBoxToken={mapBoxToken}
                     centerOnSubstation={centerOnSubstation}
@@ -1160,9 +1179,7 @@ export const NetworkMapPanel = memo(function NetworkMapPanel({
                     mapTheme={theme?.palette.mode}
                     areFlowsValid={loadFlowStatus === RunningStatus.SUCCEED}
                     onDrawPolygonModeActive={handleDrawingModeChange}
-                    onDrawEvent={(event) => {
-                        onDrawEvent(event);
-                    }}
+                    onDrawEvent={onDrawEvent}
                     shouldDisableToolTip={isInDrawingMode.value}
                     getNominalVoltageColor={getNetworkMapColor}
                 />
@@ -1191,7 +1208,9 @@ export const NetworkMapPanel = memo(function NetworkMapPanel({
 
     // Set up filteredNominalVoltages once at map initialization
     // TODO: how do we must manage case where voltages change (like when changing node), as filters are already initialized?
-    const nominalVoltagesFromMapEquipments = mapEquipments?.getNominalVoltages();
+    // memoized: getNominalVoltages scans and sorts all voltage levels, and mapEquipments
+    // is replaced (shallow-cloned) on every update, so the reference is a safe cache key
+    const nominalVoltagesFromMapEquipments = useMemo(() => mapEquipments?.getNominalVoltages(), [mapEquipments]);
     useEffect(() => {
         if (
             nominalVoltagesFromMapEquipments !== undefined &&

@@ -358,6 +358,12 @@ const SingleLineDiagramContent = memo(function SingleLineDiagramContent(props: S
      * DIAGRAM CONTENT BUILDING
      */
 
+    // Derived primitives so the viewer-creation effect below doesn't rebuild the whole
+    // SVG DOM when the theme or currentNode object references change without their
+    // relevant content changing (currentNode gets a new reference on many tree updates).
+    const isCurrentNodeReadOnly = isNodeReadOnly(currentNode);
+    const arrowsColor = theme.palette.background.paper;
+
     useLayoutEffect(() => {
         if (svg && svgRef.current) {
             const isReadyForInteraction =
@@ -381,7 +387,7 @@ const SingleLineDiagramContent = memo(function SingleLineDiagramContent(props: S
                 isReadyForInteraction ? handleNextVoltageLevelClick : null,
 
                 // callback on the breakers
-                isReadyForInteraction && !isNodeReadOnly(currentNode) ? handleBreakerClick : null,
+                isReadyForInteraction && !isCurrentNodeReadOnly ? handleBreakerClick : null,
 
                 // callback on the feeders
                 isReadyForInteraction ? showEquipmentMenu : null,
@@ -390,7 +396,7 @@ const SingleLineDiagramContent = memo(function SingleLineDiagramContent(props: S
                 isReadyForInteraction ? showBusMenu : null,
 
                 // arrows color
-                theme.palette.background.paper,
+                arrowsColor,
 
                 // Toggle popover
                 handleTogglePopover
@@ -424,13 +430,13 @@ const SingleLineDiagramContent = memo(function SingleLineDiagramContent(props: S
     }, [
         svg,
         svgMetadata,
-        currentNode,
+        isCurrentNodeReadOnly,
         isAnyNodeBuilding,
         showEquipmentMenu,
         showBusMenu,
         isDeveloperMode,
         diagramParams.type,
-        theme,
+        arrowsColor,
         modificationInProgress,
         loadingState,
         locallySwitchedBreaker,

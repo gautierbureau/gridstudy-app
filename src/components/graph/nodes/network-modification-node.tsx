@@ -28,7 +28,7 @@ import NodeOverlaySpinner from './node-overlay-spinner';
 import { BuildButton } from './build-button';
 import { Tooltip, Typography } from '@mui/material';
 import { useIntl } from 'react-intl';
-import { useCallback, useMemo } from 'react';
+import { memo, type MouseEvent, useCallback, useMemo } from 'react';
 import { TOOLTIP_DELAY } from 'utils/UIconstants';
 import ForwardRefBox from 'components/utils/forwardRefBox';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -92,9 +92,25 @@ const styles = {
     },
 } as const satisfies MuiStyles;
 
+// stable references hoisted out of the render path: every tree node renders one of
+// these Tooltips, and any inline object/handler defeats their memoization
+const tooltipComponentsProps = { tooltip: { sx: styles.tooltip } };
+const stopPropagation = (e: MouseEvent) => e.stopPropagation();
+
 const NetworkModificationNode = (props: NodeProps<ModificationNode>) => {
-    const currentNode = useSelector((state: AppState) => state.currentTreeNode);
-    const selectionForCopy = useSelector((state: AppState) => state.nodeSelectionForCopy);
+    // Select derived booleans, not the raw currentTreeNode/nodeSelectionForCopy objects:
+    // those references change on every selection, which re-rendered all N tree nodes on
+    // each click. With booleans, only the nodes whose state actually flips re-render.
+    const isSelected = useSelector((state: AppState) => props.id === state.currentTreeNode?.id);
+    const isSelectedForCut = useSelector((state: AppState) => {
+        const selectionForCopy = state.nodeSelectionForCopy;
+        return (
+            (props.id === selectionForCopy?.nodeId && selectionForCopy?.copyType === CopyType.NODE_CUT) ||
+            ((props.id === selectionForCopy?.nodeId ||
+                (selectionForCopy.allChildren?.some((child) => child.id === props.id) ?? false)) &&
+                selectionForCopy?.copyType === CopyType.SUBTREE_CUT)
+        );
+    });
     const studyUuid = useSelector((state: AppState) => state.studyUuid);
     const currentRootNetworkUuid = useSelector((state: AppState) => state.currentRootNetworkUuid);
     const { snackError, snackInfo } = useSnackMessage();
@@ -109,18 +125,6 @@ const NetworkModificationNode = (props: NodeProps<ModificationNode>) => {
         snackError({ headerId: 'uuidCopiedToClipboardError' });
     }, [snackError]);
 
-    const isSelectedNode = () => {
-        return props.id === currentNode?.id;
-    };
-
-    const isSelectedForCut = () => {
-        return (
-            (props.id === selectionForCopy?.nodeId && selectionForCopy?.copyType === CopyType.NODE_CUT) ||
-            ((props.id === selectionForCopy?.nodeId ||
-                selectionForCopy.allChildren?.map((child) => child.id)?.includes(props.id)) &&
-                selectionForCopy?.copyType === CopyType.SUBTREE_CUT)
-        );
-    };
     const tooltipContent = useMemo(() => {
         return (
             <Box style={{ whiteSpace: 'pre-line' }}>
@@ -151,9 +155,11 @@ const NetworkModificationNode = (props: NodeProps<ModificationNode>) => {
         );
     }, [props.data, props.id, intl, onClipboardCopy, onClipboardError]);
 
-    const getNodeOpacity = () => {
-        return isSelectedForCut() ? (getLocalStorageTheme() === LIGHT_THEME ? 0.3 : 0.6) : 'unset';
-    };
+    const nodeOpacity = isSelectedForCut ? (getLocalStorageTheme() === LIGHT_THEME ? 0.3 : 0.6) : 'unset';
+    const nodeSx = useMemo(
+        () => [isSelected ? styles.networkModificationSelected : styles.networkModification, { opacity: nodeOpacity }],
+        [isSelected, nodeOpacity]
+    );
 
     return (
         <>
@@ -165,7 +171,7 @@ const NetworkModificationNode = (props: NodeProps<ModificationNode>) => {
                     buildStatus={props.data.globalBuildStatus}
                     sx={styles.chipFloating}
                     icon={<ArrowUpwardIcon style={{ fontSize: '14px' }} color="inherit" />}
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={stopPropagation}
                 />
             )}
 
@@ -173,20 +179,13 @@ const NetworkModificationNode = (props: NodeProps<ModificationNode>) => {
                 title={tooltipContent}
                 disableFocusListener
                 disableTouchListener
-                componentsProps={{
-                    tooltip: { sx: { maxWidth: '720px' } },
-                }}
+                componentsProps={tooltipComponentsProps}
                 arrow
                 enterDelay={TOOLTIP_DELAY}
                 enterNextDelay={TOOLTIP_DELAY}
                 placement="left"
             >
-                <ForwardRefBox
-                    sx={[
-                        isSelectedNode() ? styles.networkModificationSelected : styles.networkModification,
-                        { opacity: getNodeOpacity() },
-                    ]}
-                >
+                <ForwardRefBox sx={nodeSx}>
                     <Box sx={styles.contentBox}>
                         <Typography variant="body1" sx={styles.typographyText}>
                             {props.data.label}
@@ -217,4 +216,6 @@ const NetworkModificationNode = (props: NodeProps<ModificationNode>) => {
     );
 };
 
-export default NetworkModificationNode;
+// memoized: xyflow re-renders node components whenever the parent tree renders;
+// with stable props and the boolean selectors above, unaffected nodes bail out
+export default memo(NetworkModificationNode);
